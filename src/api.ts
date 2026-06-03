@@ -19,6 +19,8 @@ export type VerifyResponse = {
   similarity: number;
   confidence: number;
   threshold: number;
+  live?: boolean;
+  live_confidence?: number;
 };
 
 export type SetReferenceResponse = {

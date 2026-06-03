@@ -12,3 +12,13 @@ body {
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
+
+/* Jonlilik tekshiruvi — har bir buyruq uchun progress bar animatsiyasi */
+@keyframes lv-grow {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}

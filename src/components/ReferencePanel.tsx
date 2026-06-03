@@ -1,13 +1,19 @@
 import { useRef, useState } from "react";
 import axios from "axios";
+import { ScanFace } from "lucide-react";
 import { uploadReference } from "../api";
 
 type Props = {
   referenceSet: boolean;
   onUploaded: () => void;
+  onVerifyClick: () => void;
 };
 
-export default function ReferencePanel({ referenceSet, onUploaded }: Props) {
+export default function ReferencePanel({
+  referenceSet,
+  onUploaded,
+  onVerifyClick,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -52,11 +58,6 @@ export default function ReferencePanel({ referenceSet, onUploaded }: Props) {
         </span>
       </div>
 
-      <p className="text-sm text-slate-400 mb-4">
-        O'zingizning aniq, sifatli rasmingizni yuklang. Keyinchalik kameradan
-        olingan har bir rasm shu rasm bilan solishtiriladi.
-      </p>
-
       <div className="flex flex-col gap-3">
         <div
           className="aspect-square w-full max-w-xs mx-auto rounded-xl border-2 border-dashed border-slate-600 bg-slate-900/50 flex items-center justify-center overflow-hidden cursor-pointer hover:border-sky-500 transition"
@@ -87,7 +88,11 @@ export default function ReferencePanel({ referenceSet, onUploaded }: Props) {
           disabled={loading}
           className="bg-sky-600 hover:bg-sky-500 disabled:bg-slate-600 text-white font-medium py-2.5 rounded-lg transition"
         >
-          {loading ? "Yuklanmoqda..." : "Rasm tanlash"}
+          {loading
+            ? "Yuklanmoqda..."
+            : referenceSet
+              ? "Boshqa rasm tanlash"
+              : "Rasm tanlash"}
         </button>
 
         {okMessage && (
@@ -99,6 +104,20 @@ export default function ReferencePanel({ referenceSet, onUploaded }: Props) {
           <div className="text-rose-400 text-sm bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2">
             {error}
           </div>
+        )}
+
+        {/* Shablon rasm o'rnatilgach — jonlilik tekshiruvini ochuvchi tugma */}
+        {referenceSet && (
+          <>
+            <div className="my-1 border-t border-slate-700/70" />
+            <button
+              onClick={onVerifyClick}
+              className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-lg transition"
+            >
+              <ScanFace className="h-5 w-5" />
+              Tekshirish
+            </button>
+          </>
         )}
       </div>
     </div>
