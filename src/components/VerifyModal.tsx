@@ -1,19 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Webcam from "react-webcam";
 import axios from "axios";
-import {
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  CheckCircle2,
-  Eye,
-  Loader2,
-  ShieldAlert,
-  Smile,
-  X,
-  XCircle,
-  type LucideIcon,
-} from "lucide-react";
+import { CheckCircle2, Loader2, ShieldAlert, X, XCircle } from "lucide-react";
 import { dataUrlToBlob, verifyImage, type VerifyResponse } from "../api";
 
 type Props = {
@@ -26,52 +14,17 @@ const videoConstraints = {
   facingMode: "user",
 };
 
-// Jonlilik (liveness) uchun buyruqlar. Har safar tasodifiy tartibda 3 tasi
-// tanlanadi — bu oldindan yozib olingan videoni qaytarishni qiyinlashtiradi.
-const LIVENESS_STEPS: { icon: LucideIcon; text: string }[] = [
-  { icon: Eye, text: "Ko'zingizni 2 marta pirpirating" },
-  { icon: Smile, text: "Tabassum qiling" },
-  { icon: ArrowLeft, text: "Boshingizni sekin chapga buring" },
-  { icon: ArrowRight, text: "Boshingizni sekin o'ngga buring" },
-  { icon: ArrowUp, text: "Boshingizni biroz tepaga ko'taring" },
-];
-
-const STEP_MS = 2800;
-
-type Phase =
-  | "loading"
-  | "running"
-  | "capturing"
-  | "verifying"
-  | "result"
-  | "error";
-
-function speak(text: string) {
-  try {
-    const synth = window.speechSynthesis;
-    if (!synth) return;
-    synth.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "uz-UZ";
-    u.rate = 1;
-    synth.speak(u);
-  } catch {
-    /* speechSynthesis mavjud bo'lmasligi mumkin */
-  }
-}
+type Phase = "loading" | "ready" | "verifying" | "result" | "error";
 
 export default function VerifyModal({ onClose }: Props) {
   const webcamRef = useRef<Webcam | null>(null);
   const [phase, setPhase] = useState<Phase>("loading");
-  const [cameraReady, setCameraReady] = useState(false);
-  const [steps, setSteps] = useState<typeof LIVENESS_STEPS>([]);
-  const [stepIndex, setStepIndex] = useState(0);
   const [countdown, setCountdown] = useState(3);
   const [snapshot, setSnapshot] = useState<string | null>(null);
   const [result, setResult] = useState<VerifyResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // ESC bilan yopish + ochilganda body scroll'ni bloklash
+  // ESC bilan yopish + body scroll bloklash
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -82,44 +35,10 @@ export default function VerifyModal({ onClose }: Props) {
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
-      try {
-        window.speechSynthesis?.cancel();
-      } catch {
-        /* ignore */
-      }
     };
   }, [onClose]);
 
-  const start = useCallback(() => {
-    const shuffled = [...LIVENESS_STEPS]
-      .map((s) => ({ s, r: Math.random() }))
-      .sort((a, b) => a.r - b.r)
-      .slice(0, 3)
-      .map((x) => x.s);
-    setSteps(shuffled);
-    setStepIndex(0);
-    setSnapshot(null);
-    setResult(null);
-    setError(null);
-    setPhase("running");
-  }, []);
-
-  // Qayta tekshirish — kamerani qayta tayyorlab, avtomatik boshlanadi.
-  const restart = useCallback(() => {
-    setSnapshot(null);
-    setResult(null);
-    setError(null);
-    setStepIndex(0);
-    setCameraReady(false);
-    setPhase("loading");
-  }, []);
-
-  // Kamera tayyor bo'lishi bilan jonlilik tekshiruvi avtomatik boshlanadi.
-  useEffect(() => {
-    if (phase === "loading" && cameraReady) start();
-  }, [phase, cameraReady, start]);
-
-  const doCapture = useCallback(async () => {
+  const capture = useCallback(async () => {
     const image = webcamRef.current?.getScreenshot();
     if (!image) {
       setError("Kameradan rasm olib bo'lmadi. Qayta urinib ko'ring.");
@@ -145,35 +64,29 @@ export default function VerifyModal({ onClose }: Props) {
     }
   }, []);
 
-  // Buyruqlar ketma-ketligi
-  useEffect(() => {
-    if (phase !== "running") return;
-    if (stepIndex >= steps.length) {
-      setPhase("capturing");
-      return;
-    }
-    speak(steps[stepIndex].text);
-    const id = window.setTimeout(() => setStepIndex((i) => i + 1), STEP_MS);
-    return () => window.clearTimeout(id);
-  }, [phase, stepIndex, steps]);
+  const retake = useCallback(() => {
+    setSnapshot(null);
+    setResult(null);
+    setError(null);
+    setPhase("ready");
+  }, []);
 
-  // Rasmga olishdan oldingi sanoq
+  // Kamera tayyor bo'lgach qisqa sanoqdan keyin avtomatik rasmga olinadi
   useEffect(() => {
-    if (phase !== "capturing") return;
-    speak("Qimirlamang, rasmga olinmoqda");
+    if (phase !== "ready") return;
     let n = 3;
     setCountdown(n);
     const id = window.setInterval(() => {
       n -= 1;
       if (n <= 0) {
         window.clearInterval(id);
-        void doCapture();
+        void capture();
       } else {
         setCountdown(n);
       }
     }, 800);
     return () => window.clearInterval(id);
-  }, [phase, doCapture]);
+  }, [phase, capture]);
 
   const showSnapshot =
     !!snapshot &&
@@ -191,7 +104,7 @@ export default function VerifyModal({ onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
           <h2 className="text-base font-semibold text-white">
-            Jonlilik tekshiruvi
+            Kamera orqali tekshirish
           </h2>
           <button
             onClick={onClose}
@@ -218,7 +131,7 @@ export default function VerifyModal({ onClose }: Props) {
                 screenshotFormat="image/jpeg"
                 mirrored
                 videoConstraints={videoConstraints}
-                onUserMedia={() => setCameraReady(true)}
+                onUserMedia={() => setPhase((p) => (p === "loading" ? "ready" : p))}
                 onUserMediaError={() => {
                   setError(
                     "Kameraga ruxsat berilmadi yoki kamera topilmadi. Brauzer ruxsatini tekshiring.",
@@ -230,13 +143,13 @@ export default function VerifyModal({ onClose }: Props) {
             )}
 
             {/* Yuz uchun yo'naltiruvchi oval */}
-            {(phase === "loading" || phase === "running") && (
+            {(phase === "loading" || phase === "ready") && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <div className="h-3/4 w-3/5 rounded-[50%] border-2 border-dashed border-white/40" />
               </div>
             )}
 
-            {/* Loading overlay — kamera tayyor bo'lishi bilan avtomatik boshlanadi */}
+            {/* Loading overlay */}
             {phase === "loading" && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/55 text-sm text-slate-200">
                 <Loader2 className="h-8 w-8 animate-spin text-sky-400" />
@@ -244,38 +157,18 @@ export default function VerifyModal({ onClose }: Props) {
               </div>
             )}
 
-            {/* Running — buyruq overlay */}
-            {phase === "running" && steps[stepIndex] && (
+            {/* Avtomatik rasmga olishdan oldingi sanoq */}
+            {phase === "ready" && (
               <>
-                <div className="absolute inset-x-0 top-0 flex flex-col items-center gap-1 bg-linear-to-b from-black/70 to-transparent px-4 pb-8 pt-4 text-center">
-                  {(() => {
-                    const Icon = steps[stepIndex].icon;
-                    return <Icon className="h-11 w-11 text-white drop-shadow" />;
-                  })()}
-                  <div className="text-base font-semibold text-white drop-shadow">
-                    {steps[stepIndex].text}
-                  </div>
-                  <div className="text-xs text-slate-300">
-                    {stepIndex + 1} / {steps.length}
-                  </div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-7xl font-bold text-white drop-shadow-lg">
+                    {countdown}
+                  </span>
                 </div>
-                <div className="absolute inset-x-0 bottom-0 h-1.5 bg-black/40">
-                  <div
-                    key={stepIndex}
-                    className="h-full bg-sky-500"
-                    style={{ animation: `lv-grow ${STEP_MS}ms linear forwards` }}
-                  />
+                <div className="absolute inset-x-0 bottom-5 text-center text-sm font-medium text-slate-200 drop-shadow">
+                  Yuzingizni doira ichiga joylang
                 </div>
               </>
-            )}
-
-            {/* Capturing — sanoq */}
-            {phase === "capturing" && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                <span className="text-7xl font-bold text-white drop-shadow-lg">
-                  {countdown}
-                </span>
-              </div>
             )}
 
             {/* Verifying */}
@@ -287,11 +180,11 @@ export default function VerifyModal({ onClose }: Props) {
             )}
           </div>
 
-          {/* Holat matni / natija / xato */}
+          {/* Natija / xato */}
           <div className="mt-4">
-            {phase === "running" && (
+            {phase === "ready" && (
               <p className="text-center text-sm text-slate-400">
-                Buyruqlarni bajaring — so'ng avtomatik rasmga olinadi.
+                Avtomatik rasmga olinmoqda...
               </p>
             )}
 
@@ -303,14 +196,13 @@ export default function VerifyModal({ onClose }: Props) {
 
             {phase === "result" && result && <ResultCard result={result} />}
 
-            {/* Tugmalar */}
             {(phase === "result" || phase === "error") && (
               <div className="mt-4 flex gap-3">
                 <button
-                  onClick={restart}
+                  onClick={retake}
                   className="flex-1 rounded-lg bg-sky-600 py-2.5 font-medium text-white transition hover:bg-sky-500"
                 >
-                  Qayta tekshirish
+                  Qayta urinish
                 </button>
                 <button
                   onClick={onClose}
@@ -331,7 +223,6 @@ function ResultCard({ result }: { result: VerifyResponse }) {
   const percent = (result.confidence * 100).toFixed(1);
   const isSpoof = result.live === false;
 
-  // Soxta yuz aniqlangan holat — alohida ogohlantirish
   if (isSpoof) {
     return (
       <div className="rounded-xl border border-amber-500/50 bg-amber-500/10 p-4">
