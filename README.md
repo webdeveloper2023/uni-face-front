@@ -22,7 +22,12 @@ cp .env.example .env       # kerak bo'lsa API URL ni o'zgartiring
 npm run dev
 ```
 
-Dev server: <http://localhost:5173>
+Dev server: <http://127.0.0.1:5400>
+
+> **Eslatma:** Windows'da default Vite porti **5173** ko'pincha Hyper-V / WSL
+> tomonidan band qilinadi (`EACCES`). Shu sabab loyiha **5400** portida
+> ishlaydi. Hozir band qilingan port range'lari:
+> `netsh interface ipv4 show excludedportrange protocol=tcp`
 
 > Backend (`uni-face`) `http://localhost:8000` da ishlab turishi kerak.
 > Backendda CORS ochiq (`*`), shuning uchun frontend to'g'ridan-to'g'ri murojaat
